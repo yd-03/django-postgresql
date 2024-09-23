@@ -1,0 +1,42 @@
+version: "3.9"
+
+services:
+  db:
+    container_name: postgres
+    build:
+      context: .
+      dockerfile: containers/postgres/Dockerfile
+    platform: linux/x86_64
+    volumes:
+      - db_data:/var/lib/postgresql/data # データ永続化のためのボリューム
+    ports:
+      - "5432:5432" # PostgreSQLのデフォルトポート
+    healthcheck:
+      test: pg_isready -U "${POSTGRES_USER:-postgres}" || exit 1 # PostgreSQLのヘルスチェック
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    env_file:
+      - .env.dev # 環境変数ファイルの読み込み
+
+  app:
+    container_name: app
+    build:
+      context: .
+      dockerfile: containers/django/Dockerfile
+    volumes:
+      - .:/code # ソースコードのマウント
+      - ./static:/static # 静的ファイルのマウント
+    ports:
+      - "8000:8000" # アプリケーションのデフォルトポート
+    command: sh -c "/usr/local/bin/entrypoint.sh" # エントリーポイントスクリプトの実行
+    env_file:
+      - .env.dev # 環境変数ファイルの読み込み
+    depends_on:
+      db:
+        condition: service_healthy # dbサービスがヘルシーであることを条件とする
+
+volumes:
+  db_data: # PostgreSQLデータ用ボリューム
+  static: # 静的ファイル用ボリューム
